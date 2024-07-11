@@ -1,0 +1,6 @@
+streamlit
+moviepy
+whisper
+pinecone-client
+langchain-pinecone
+langchain-openai
