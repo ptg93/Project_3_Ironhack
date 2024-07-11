@@ -23,6 +23,7 @@ def extract_audio(video_path):
     audio_path = "audio.wav"
     command = [
         "ffmpeg",
+        "-y",  # Add this flag to automatically overwrite files
         "-i", video_path,
         "-vn",
         "-acodec", "pcm_s16le",
@@ -43,12 +44,16 @@ def transcribe_audio(audio_path):
     return result["text"]
 
 def store_transcript(transcript):
-    vectorstore = PineconeVectorStore.from_texts(
-        [transcript],
-        embeddings,
-        index_name=index_name
-    )
-    return vectorstore
+    try:
+        vectorstore = PineconeVectorStore.from_texts(
+            [transcript],
+            embeddings,
+            index_name=index_name
+        )
+        return vectorstore
+    except Exception as e:
+        st.error(f"An error occurred while storing the transcript: {str(e)}")
+        raise e
 
 # Initialize Pinecone
 pc = Pinecone(api_key=os.getenv('PINECONE_API_KEY'))
