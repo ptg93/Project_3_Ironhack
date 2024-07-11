@@ -12,10 +12,8 @@ from langchain.chains import ConversationalRetrievalChain
 import os
 
 def save_uploaded_file(uploaded_file):
-    # Ensure the directory exists
     if not os.path.exists("tempDir"):
         os.makedirs("tempDir")
-    # Save the uploaded file
     file_path = os.path.join("tempDir", uploaded_file.name)
     with open(file_path, "wb") as f:
         f.write(uploaded_file.getbuffer())
@@ -78,7 +76,7 @@ if option == 'Upload from device':
         file_path = save_uploaded_file(uploaded_file)
 else:
     youtube_link = st.text_input("Enter YouTube link")
-    # You would need to add code here to download the video from YouTube if using this option
+    # Add code here to download the video from YouTube if using this option
 
 if file_path:
     audio_path = extract_audio(file_path)
