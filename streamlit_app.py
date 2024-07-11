@@ -2,8 +2,8 @@ import streamlit as st
 from moviepy.editor import VideoFileClip
 import whisper
 import pinecone
-from langchain_pinecone import PineconeVectorStore
-from langchain_openai import OpenAIEmbeddings
+from langchain.vectorstores import Pinecone
+from langchain.embeddings import OpenAIEmbeddings
 from langchain.chains import RetrievalQA
 from langchain.llms import OpenAI
 from langchain.prompts import PromptTemplate
@@ -28,7 +28,7 @@ def transcribe_audio(audio_path):
     return result["text"]
 
 def store_transcript(transcript):
-    vectorstore = PineconeVectorStore.from_texts(
+    vectorstore = Pinecone.from_texts(
         [transcript],
         embeddings,
         index_name=index_name
