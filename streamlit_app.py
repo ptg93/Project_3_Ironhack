@@ -8,7 +8,7 @@ from langchain.chains import RetrievalQA
 from langchain.llms import OpenAI
 from langchain.prompts import PromptTemplate
 from langchain.memory import ConversationBufferMemory
-from langchain.chains import ConversationChain
+from langchain.chains import ConversationalRetrievalChain
 import os
 
 def save_uploaded_file(uploaded_file):
@@ -57,14 +57,8 @@ prompt_template = PromptTemplate(
     input_variables=["context", "question"],
     template="You are a helpful assistant. Answer the following question based on the context: {context}\n\nQuestion: {question}\n\nAnswer:"
 )
-qa_chain = RetrievalQA(
-    retriever=None,  # This will be set after storing the transcript
-    llm=llm,
-    prompt_template=prompt_template
-)
 
 memory = ConversationBufferMemory()
-conversation_chain = ConversationChain(llm=llm, memory=memory)
 
 # Streamlit App
 st.title("Video Transcription Chatbot")
@@ -86,7 +80,14 @@ if file_path:
     transcript = transcribe_audio(audio_path)
     st.write(transcript)
     vectorstore = store_transcript(transcript)
-    qa_chain.retriever = vectorstore.as_retriever()
+
+    qa_chain = ConversationalRetrievalChain(
+        retriever=vectorstore.as_retriever(),
+        llm=llm,
+        memory=memory,
+        input_variables=["context", "question"],
+        template=prompt_template
+    )
 
     user_query = st.text_input("Ask a question about the video:")
     if user_query:
@@ -95,5 +96,5 @@ if file_path:
 
     user_query = st.text_input("Continue the conversation:")
     if user_query:
-        answer = conversation_chain.run(input=user_query)
+        answer = qa_chain.run({"question": user_query})
         st.write(answer)
