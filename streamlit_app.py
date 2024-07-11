@@ -1,6 +1,6 @@
 import streamlit as st
 import whisper
-from subprocess import run
+import subprocess
 from pinecone import Pinecone, ServerlessSpec
 from langchain.vectorstores import Pinecone as PineconeVectorStore
 from langchain.embeddings import OpenAIEmbeddings
@@ -30,7 +30,11 @@ def extract_audio(video_path):
         "-ac", "2",
         audio_path
     ]
-    run(command, check=True)
+    try:
+        result = subprocess.run(command, check=True, capture_output=True, text=True)
+        st.write(result.stdout)
+    except subprocess.CalledProcessError as e:
+        st.error(f"An error occurred while extracting audio: {e.stderr}")
     return audio_path
 
 def transcribe_audio(audio_path):
