@@ -54,7 +54,8 @@ embeddings = OpenAIEmbeddings()
 # Initialize LangChain components
 llm = OpenAI()
 prompt_template = PromptTemplate(
-    "You are a helpful assistant. Answer the following question based on the context: {context}\n\nQuestion: {question}\n\nAnswer:"
+    input_variables=["context", "question"],
+    template="You are a helpful assistant. Answer the following question based on the context: {context}\n\nQuestion: {question}\n\nAnswer:"
 )
 qa_chain = RetrievalQA(
     retriever=None,  # This will be set after storing the transcript
