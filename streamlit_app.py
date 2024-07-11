@@ -1,8 +1,8 @@
 import streamlit as st
 from moviepy.editor import VideoFileClip
 import whisper
-import pinecone
-from langchain.vectorstores import Pinecone
+from pinecone import Pinecone, ServerlessSpec
+from langchain.vectorstores import Pinecone as PineconeVectorStore
 from langchain.embeddings import OpenAIEmbeddings
 from langchain.chains import RetrievalQA
 from langchain.llms import OpenAI
@@ -28,7 +28,7 @@ def transcribe_audio(audio_path):
     return result["text"]
 
 def store_transcript(transcript):
-    vectorstore = Pinecone.from_texts(
+    vectorstore = PineconeVectorStore.from_texts(
         [transcript],
         embeddings,
         index_name=index_name
@@ -36,11 +36,19 @@ def store_transcript(transcript):
     return vectorstore
 
 # Initialize Pinecone
-pinecone.init(api_key=os.getenv('PINECONE_API_KEY'))
+pc = Pinecone(api_key=os.getenv('PINECONE_API_KEY'))
 index_name = "video-transcriptions"
-if index_name not in pinecone.list_indexes():
-    pinecone.create_index(index_name, dimension=1536)
-index = pinecone.Index(index_name)
+if index_name not in pc.list_indexes().names():
+    pc.create_index(
+        name=index_name, 
+        dimension=1536, 
+        metric='euclidean',
+        spec=ServerlessSpec(
+            cloud='aws',
+            region='us-west-2'
+        )
+    )
+index = pc.Index(index_name)
 embeddings = OpenAIEmbeddings()
 
 # Initialize LangChain components
