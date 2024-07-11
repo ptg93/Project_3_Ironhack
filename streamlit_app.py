@@ -9,6 +9,7 @@ from langchain.llms import OpenAI
 from langchain.prompts import PromptTemplate
 from langchain.memory import ConversationBufferMemory
 from langchain.chains import ConversationalRetrievalChain
+from langchain.text_splitter import RecursiveCharacterTextSplitter
 import os
 
 def save_uploaded_file(uploaded_file):
@@ -44,12 +45,17 @@ def transcribe_audio(audio_path):
     return result["text"]
 
 def store_transcript(transcript):
+    chunk_size = 500
+    chunk_overlap = 50
+    text_splitter = RecursiveCharacterTextSplitter(chunk_size=chunk_size, chunk_overlap=chunk_overlap)
+    chunks = text_splitter.split_text(transcript)
+
     try:
-        vectorstore = PineconeVectorStore.from_texts(
-            [transcript],
-            embeddings,
-            index_name=index_name
-        )
+        # Initialize Pinecone vector store
+        vectorstore = PineconeVectorStore(embeddings, index_name=index_name)
+        # Store each chunk
+        for chunk in chunks:
+            vectorstore.add_texts([chunk])
         return vectorstore
     except Exception as e:
         st.error(f"An error occurred while storing the transcript: {str(e)}")
@@ -58,16 +64,34 @@ def store_transcript(transcript):
 # Initialize Pinecone
 pc = Pinecone(api_key=os.getenv('PINECONE_API_KEY'))
 index_name = "video-transcriptions"
-if index_name not in pc.list_indexes().names():
+embedding_dim = 1536  # Ensure this matches the embedding model's dimension
+
+# Check if the index exists with the correct dimension
+indexes = pc.list_indexes()
+if index_name in indexes.names():
+    index_info = pc.describe_index(index_name)
+    if index_info.dimension != embedding_dim:
+        pc.delete_index(index_name)
+        pc.create_index(
+            name=index_name, 
+            dimension=embedding_dim, 
+            metric='euclidean',
+            spec=ServerlessSpec(
+                cloud='aws',
+                region='us-west-2'
+            )
+        )
+else:
     pc.create_index(
         name=index_name, 
-        dimension=1536, 
+        dimension=embedding_dim, 
         metric='euclidean',
         spec=ServerlessSpec(
             cloud='aws',
             region='us-west-2'
         )
     )
+
 index = pc.Index(index_name)
 embeddings = OpenAIEmbeddings()
 
