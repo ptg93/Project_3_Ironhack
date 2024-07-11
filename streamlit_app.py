@@ -1,6 +1,6 @@
 import streamlit as st
-from moviepy.editor import VideoFileClip
 import whisper
+from subprocess import run
 from pinecone import Pinecone, ServerlessSpec
 from langchain.vectorstores import Pinecone as PineconeVectorStore
 from langchain.embeddings import OpenAIEmbeddings
@@ -20,9 +20,17 @@ def save_uploaded_file(uploaded_file):
     return file_path
 
 def extract_audio(video_path):
-    video = VideoFileClip(video_path)
     audio_path = "audio.wav"
-    video.audio.write_audiofile(audio_path)
+    command = [
+        "ffmpeg",
+        "-i", video_path,
+        "-vn",
+        "-acodec", "pcm_s16le",
+        "-ar", "44100",
+        "-ac", "2",
+        audio_path
+    ]
+    run(command, check=True)
     return audio_path
 
 def transcribe_audio(audio_path):
