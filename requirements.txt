@@ -2,5 +2,7 @@ streamlit
 moviepy
 whisper
 pinecone-client
+langchain
 langchain-pinecone
 langchain-openai
+
