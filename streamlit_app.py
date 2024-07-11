@@ -12,9 +12,14 @@ from langchain.chains import ConversationalRetrievalChain
 import os
 
 def save_uploaded_file(uploaded_file):
-    with open(os.path.join("tempDir", uploaded_file.name), "wb") as f:
+    # Ensure the directory exists
+    if not os.path.exists("tempDir"):
+        os.makedirs("tempDir")
+    # Save the uploaded file
+    file_path = os.path.join("tempDir", uploaded_file.name)
+    with open(file_path, "wb") as f:
         f.write(uploaded_file.getbuffer())
-    return os.path.join("tempDir", uploaded_file.name)
+    return file_path
 
 def extract_audio(video_path):
     video = VideoFileClip(video_path)
