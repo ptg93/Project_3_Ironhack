@@ -23,7 +23,7 @@ from langchain.chains import RetrievalQA
 from langgraph.checkpoint import MemorySaver
 from langchain.tools.retriever import create_retriever_tool
 from langgraph.prebuilt import create_react_agent
-from langchain.agents import Tool  # Ensure this import is present
+from langchain.agents import Tool
 
 # Load environment variables
 load_dotenv()
@@ -394,14 +394,14 @@ chatbot = VideoChatbot()
 
 st.title("Video Processing App")
 
-source_type = st.selectbox('Source Type', ['upload', 'youtube'])
+source_type = st.selectbox('Source Type', ['upload', 'youtube'], key='source_type')
 if source_type == 'upload':
-    uploaded_file = st.file_uploader("Choose a video file", type=["mp4", "mov", "avi", "mkv"])
+    uploaded_file = st.file_uploader("Choose a video file", type=["mp4", "mov", "avi", "mkv"], key='uploaded_file')
 else:
-    url = st.text_input("YouTube URL")
+    url = st.text_input("YouTube URL", key='youtube_url')
 
-mode = st.selectbox('Mode', ["Fast", "Accurate"])
-process_type = st.selectbox('Process Type', ["Transcription", "Diarization"])
+mode = st.selectbox('Mode', ["Fast", "Accurate"], key='mode')
+process_type = st.selectbox('Process Type', ["Transcription", "Diarization"], key='process_type')
 
 if st.button("Process Video"):
     if source_type == 'upload' and uploaded_file:
@@ -427,9 +427,10 @@ if st.button("Process Video"):
         else:
             st.write("Failed to create vectorstore.")
 
-query = st.text_input("Enter your query about the video")
+query = st.text_input("Enter your query about the video", key='query')
 if st.button("Submit Query") and query:
     if chatbot.agent:
         chatbot.process_query(query)
     else:
         st.write("Agent not initialized.")
+
