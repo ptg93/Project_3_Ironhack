@@ -1,7 +1,7 @@
 import os
 import time
+import streamlit as st
 from dotenv import load_dotenv
-from flask import Flask, request, jsonify, render_template
 
 import yt_dlp
 from moviepy.editor import VideoFileClip
@@ -15,18 +15,10 @@ from langchain.vectorstores import Chroma
 from langchain.embeddings.openai import OpenAIEmbeddings
 from langchain.schema import Document
 
-from langchain.chains import (
-    create_retrieval_chain,
-    create_history_aware_retriever,
-    RetrievalQA,
-)
+from langchain.chains import RetrievalQA
 
 from langgraph.checkpoint import MemorySaver
-from langchain_core.messages import AIMessage, BaseMessage, HumanMessage, ToolMessage
-
 from langchain.tools.retriever import create_retriever_tool
-from langchain_core.tools import tool
-
 from langgraph.prebuilt import create_react_agent
 
 # Load environment variables
@@ -43,23 +35,21 @@ elif not LANGCHAIN_API_KEY:
 
 os.environ["LANGCHAIN_TRACING_V2"] = "true"
 os.environ["LANGCHAIN_PROJECT"] = "Ironhack_Project3"
-os.environ["LANGCHAIN_ENDPOINT"]="https://api.smith.langchain.com"
+os.environ["LANGCHAIN_ENDPOINT"] = "https://api.smith.langchain.com"
 
 # Set up directories
 os.makedirs('uploads', exist_ok=True)
 os.makedirs('downloads', exist_ok=True)
 
-app = Flask(__name__)
-
-def save_uploaded_file(file):
+def save_uploaded_file(uploaded_file):
     start_time = time.time()
-    filename = file.filename
-    file_path = os.path.join('uploads', filename)
-    file.save(file_path)
+    file_path = os.path.join('uploads', uploaded_file.name)
+    with open(file_path, 'wb') as f:
+        f.write(uploaded_file.getbuffer())
     end_time = time.time()
     duration = end_time - start_time
-    print(f"File {filename} uploaded successfully to {file_path} in {duration:.2f} seconds")
-    return file_path, filename, duration
+    st.write(f"File {uploaded_file.name} uploaded successfully to {file_path} in {duration:.2f} seconds")
+    return file_path, uploaded_file.name, duration
 
 def extract_metadata_ffmpeg(video_path):
     try:
@@ -72,10 +62,10 @@ def extract_metadata_ffmpeg(video_path):
             "codec_name": video_info['codec_name'],
             "bit_rate": int(video_info['bit_rate'])
         }
-        print(f"Extracted metadata: {metadata}")
+        st.write(f"Extracted metadata: {metadata}")
         return metadata
     except Exception as e:
-        print(f"Error extracting metadata with ffmpeg: {e}")
+        st.write(f"Error extracting metadata with ffmpeg: {e}")
         return None
 
 def download_youtube_video(url):
@@ -111,12 +101,12 @@ def download_youtube_video(url):
                 "release_date": info_dict.get('release_date'),
                 "availability": info_dict.get('availability')
             }
-            
+
             for key, value in metadata.items():
                 if value is None:
                     metadata[key] = "Empty"
-            
-            print(f"Video title: {metadata['title']}")
+
+            st.write(f"Video title: {metadata['title']}")
 
             video_ext = metadata['ext']
             initial_path = os.path.abspath(f'downloads/video.{video_ext}')
@@ -130,15 +120,15 @@ def download_youtube_video(url):
                 final_path = os.path.abspath(f'downloads/video_{counter}.{video_ext}')
 
             os.rename(initial_path, final_path)
-            print(f"Downloaded video saved to: {final_path}")
+            st.write(f"Downloaded video saved to: {final_path}")
 
             end_time = time.time()
             duration = end_time - start_time
-            print(f"Time taken for downloading video: {duration:.2f} seconds")
-            
+            st.write(f"Time taken for downloading video: {duration:.2f} seconds")
+
             return final_path, metadata, duration
     except Exception as e:
-        print(f"Error downloading video: {e}")
+        st.write(f"Error downloading video: {e}")
         return None, None, 0
 
 def extract_audio(video_path):
@@ -147,16 +137,16 @@ def extract_audio(video_path):
         video = VideoFileClip(video_path)
         audio_path = video_path.replace('.mp4', '.wav')
         audio_path = os.path.abspath(audio_path)
-        print(f"Extracting audio to: {audio_path}")
+        st.write(f"Extracting audio to: {audio_path}")
         video.audio.write_audiofile(audio_path)
         if not os.path.isfile(audio_path):
             raise FileNotFoundError(f"Extracted audio file not found: {audio_path}")
         end_time = time.time()
         duration = end_time - start_time
-        print(f"Audio extracted in {duration:.2f} seconds")
+        st.write(f"Audio extracted in {duration:.2f} seconds")
         return audio_path, duration
     except Exception as e:
-        print(f"Error extracting audio: {e}")
+        st.write(f"Error extracting audio: {e}")
         return None, 0
 
 def select_whisper_model(duration, mode='Fast'):
@@ -176,56 +166,56 @@ def select_whisper_model(duration, mode='Fast'):
             model_name = "base"
         else:  # 10 minutes or less
             model_name = "small"
-    
-    print(f"Selected Whisper model: {model_name}")
+
+    st.write(f"Selected Whisper model: {model_name}")
     return model_name
 
 def transcribe_audio(audio_path, duration, mode='Fast'):
     start_time = time.time()
     try:
-        print(f"Transcribing audio from: {audio_path}")
+        st.write(f"Transcribing audio from: {audio_path}")
         if not os.path.isfile(audio_path):
             raise FileNotFoundError(f"Audio file not found: {audio_path}")
 
         model_name = select_whisper_model(duration, mode)
         model = whisper.load_model(model_name)
-        
+
         # Check if CUDA is available and use it
         if torch.cuda.is_available():
             model = model.to("cuda")
-            print("Using CUDA for Whisper transcription")
-        
+            st.write("Using CUDA for Whisper transcription")
+
         result = model.transcribe(audio_path)
         end_time = time.time()
         transcription_duration = end_time - start_time
-        print(f"Transcription completed in {transcription_duration:.2f} seconds.")
+        st.write(f"Transcription completed in {transcription_duration:.2f} seconds.")
         return result['text'], transcription_duration
     except Exception as e:
-        print(f"Error transcribing audio: {e}")
+        st.write(f"Error transcribing audio: {e}")
         return "", 0
 
 def transcribe_audio_with_timestamps(audio_path, duration, mode='Fast'):
     start_time = time.time()
     try:
-        print(f"Transcribing audio from: {audio_path}")
+        st.write(f"Transcribing audio from: {audio_path}")
         if not os.path.isfile(audio_path):
             raise FileNotFoundError(f"Audio file not found: {audio_path}")
 
         model_name = select_whisper_model(duration, mode)
         model = whisper.load_model(model_name)
-        
+
         # Check if CUDA is available and use it
         if torch.cuda.is_available():
             model = model.to("cuda")
-            print("Using CUDA for Whisper transcription")
-        
+            st.write("Using CUDA for Whisper transcription")
+
         result = model.transcribe(audio_path, word_timestamps=True)
         end_time = time.time()
         transcription_duration = end_time - start_time
-        print(f"Transcription with timestamps completed in {transcription_duration:.2f} seconds.")
+        st.write(f"Transcription with timestamps completed in {transcription_duration:.2f} seconds.")
         return result, transcription_duration
     except Exception as e:
-        print(f"Error transcribing audio: {e}")
+        st.write(f"Error transcribing audio: {e}")
         return {}, 0
 
 def combine_metadata_and_transcription(metadata, transcription):
@@ -255,21 +245,21 @@ def perform_diarization(audio_path, duration, mode='Fast'):
         # Check if CUDA is available and use it
         if torch.cuda.is_available():
             pipeline.to(torch.device("cuda"))
-            print("Using CUDA for Pyannote diarization")
-        
+            st.write("Using CUDA for Pyannote diarization")
+
         diarization_result = pipeline(audio_path)
         end_time = time.time()
         diarization_duration = end_time - start_time
-        print(f"Diarization completed in {diarization_duration:.2f} seconds.")
+        st.write(f"Diarization completed in {diarization_duration:.2f} seconds.")
         return diarization_result, diarization_duration
     except Exception as e:
-        print(f"Error during diarization: {e}")
+        st.write(f"Error during diarization: {e}")
         return None, 0
 
 def process_video(source_type, source, mode='Fast', process_type='Transcription'):
     timings = {}
     total_start_time = time.time()
-    
+
     if source_type == 'upload':
         video_path, filename, upload_duration = save_uploaded_file(source)
         metadata = extract_metadata_ffmpeg(video_path)
@@ -278,56 +268,56 @@ def process_video(source_type, source, mode='Fast', process_type='Transcription'
         video_path, metadata, download_duration = download_youtube_video(source)
         timings['download'] = download_duration
     else:
-        print("Invalid source type.")
+        st.write("Invalid source type.")
         return None
-    
+
     if not video_path or not metadata:
-        print("Failed to get video or metadata.")
+        st.write("Failed to get video or metadata.")
         return None
-    
+
     audio_path, extract_duration = extract_audio(video_path)
     if not audio_path:
-        print("Failed to extract audio.")
+        st.write("Failed to extract audio.")
         return None
     timings['extract_audio'] = extract_duration
-    
+
     if process_type == 'Transcription':
         transcription, transcribe_duration = transcribe_audio(audio_path, metadata['duration'], mode)
         if not transcription:
-            print("Failed to transcribe audio.")
+            st.write("Failed to transcribe audio.")
             return None
         timings['transcribe_audio'] = transcribe_duration
         combined_text = combine_metadata_and_transcription(metadata, transcription)
     elif process_type == 'Diarization':
         transcription_result, transcribe_duration = transcribe_audio_with_timestamps(audio_path, metadata['duration'], mode)
         if not transcription_result:
-            print("Failed to transcribe audio with timestamps.")
+            st.write("Failed to transcribe audio with timestamps.")
             return None
         timings['transcribe_audio_with_timestamps'] = transcribe_duration
-        
+
         diarization_result, diarization_duration = perform_diarization(audio_path, metadata['duration'], mode)
         if not diarization_result:
-            print("Failed to perform diarization.")
+            st.write("Failed to perform diarization.")
             return None
         timings['diarization'] = diarization_duration
-        
+
         combined_text = combine_metadata_transcription_diarization(metadata, transcription_result, diarization_result)
-    
+
     total_end_time = time.time()
     timings['total_processing'] = total_end_time - total_start_time
-    
-    print(combined_text)
-    print("Timings:", timings)
-    
+
+    st.write(combined_text)
+    st.write("Timings:", timings)
+
     document = Document(page_content=combined_text, metadata=metadata)
-    
+
     # Clean up files
     try:
         os.remove(video_path)
         os.remove(audio_path)
     except Exception as e:
-        print(f"Error deleting files: {e}")
-    
+        st.write(f"Error deleting files: {e}")
+
     return document
 
 def create_vectorstore(document):
@@ -336,7 +326,7 @@ def create_vectorstore(document):
         retriever = vectorstore.as_retriever()
         return retriever
     except Exception as e:
-        print(f"Error creating vectorstore: {e}")
+        st.write(f"Error creating vectorstore: {e}")
         return None
 
 class VideoChatbot:
@@ -364,10 +354,10 @@ class VideoChatbot:
                 chain_type="stuff",
                 retriever=self.retriever
             )
-            print("QA chain initialized successfully.")
+            st.write("QA chain initialized successfully.")
             self.qa_chain = qa
         except Exception as e:
-            print(f"Error initializing QA chains: {e}")
+            st.write(f"Error initializing QA chains: {e}")
             self.qa_chain = None
 
     def create_agent(self):
@@ -381,11 +371,11 @@ class VideoChatbot:
             ),
         ]
         self.agent = create_react_agent(self.model, tools=tools, messages_modifier=self.prompt, checkpointer=self.memory)
-        print("Agent created successfully.")
+        st.write("Agent created successfully.")
 
     def process_query(self, query):
         if not self.agent:
-            print("Agent not initialized.")
+            st.write("Agent not initialized.")
             return
 
         inputs = {"messages": [("user", query)]}
@@ -394,48 +384,50 @@ class VideoChatbot:
         for s in stream:
             message = s["messages"][-1]
             if isinstance(message, tuple):
-                print(message)
+                st.write(message)
             else:
-                message.pretty_print()
+                st.write(message.pretty_print())
 
 chatbot = VideoChatbot()
 
-@app.route('/')
-def index():
-    return render_template('index.html')
+st.title("Video Processing App")
 
-@app.route('/process', methods=['POST'])
-def process():
-    source_type = request.form.get('source_type')
-    source = request.files.get('file') if source_type == 'upload' else request.form.get('url')
-    mode = request.form.get('mode')
-    process_type = request.form.get('process_type')
-    
-    document = process_video(source_type, source, mode, process_type)
+source_type = st.selectbox('Source Type', ['upload', 'youtube'])
+if source_type == 'upload':
+    uploaded_file = st.file_uploader("Choose a video file", type=["mp4", "mov", "avi", "mkv"])
+else:
+    url = st.text_input("YouTube URL")
+
+mode = st.selectbox('Mode', ["Fast", "Accurate"])
+process_type = st.selectbox('Process Type', ["Transcription", "Diarization"])
+
+if st.button("Process Video"):
+    if source_type == 'upload' and uploaded_file:
+        document = process_video(source_type, uploaded_file, mode, process_type)
+    elif source_type == 'youtube' and url:
+        document = process_video(source_type, url, mode, process_type)
+    else:
+        st.write("Please provide a YouTube URL or upload a file.")
+        document = None
+
     if document:
         try:
             vectorstore = Chroma.from_documents(documents=[document], embedding=OpenAIEmbeddings())
             chatbot.retriever = vectorstore.as_retriever()
         except Exception as e:
-            return jsonify({'error': f"Error creating vectorstore: {e}"}), 500
-    
+            st.write(f"Error creating vectorstore: {e}")
+            document = None
+
         if chatbot.retriever:
+            st.write("Vectorstore created and retriever initialized.")
             chatbot.initialize_qa_chain()
             chatbot.create_agent()
-            return jsonify({'success': True, 'message': 'Video processed and vectorstore created.'}), 200
         else:
-            return jsonify({'error': 'Failed to create vectorstore.'}), 500
-    else:
-        return jsonify({'error': 'Failed to process video.'}), 500
+            st.write("Failed to create vectorstore.")
 
-@app.route('/query', methods=['POST'])
-def query():
-    query = request.form.get('query')
+query = st.text_input("Enter your query about the video")
+if st.button("Submit Query") and query:
     if chatbot.agent:
         chatbot.process_query(query)
-        return jsonify({'success': True, 'message': 'Query processed.'}), 200
     else:
-        return jsonify({'error': 'Agent not initialized.'}), 500
-
-if __name__ == '__main__':
-    app.run(debug=True)
+        st.write("Agent not initialized.")
