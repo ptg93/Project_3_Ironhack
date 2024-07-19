@@ -24,6 +24,7 @@ from langchain.chains import RetrievalQA
 from langgraph.checkpoint import MemorySaver
 from langchain.tools.retriever import create_retriever_tool
 from langgraph.prebuilt import create_react_agent
+from langchain.agents import Tool
 
 # Load environment variables
 load_dotenv()
