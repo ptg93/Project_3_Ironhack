@@ -1,3 +1,6 @@
+__import__('pysqlite3')
+import sys
+sys.modules['sqlite3'] = sys.modules.pop('pysqlite3')
 import os
 import time
 import streamlit as st
@@ -9,6 +12,7 @@ import whisper
 from pyannote.audio import Pipeline
 import torch
 import ffmpeg
+import sqlite3
 
 from langchain_openai import ChatOpenAI
 from langchain.vectorstores import Chroma
