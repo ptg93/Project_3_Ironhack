@@ -12,7 +12,6 @@ import whisper
 from pyannote.audio import Pipeline
 import torch
 import ffmpeg
-import sqlite3
 
 from langchain_openai import ChatOpenAI
 from langchain.vectorstores import Chroma
@@ -24,7 +23,7 @@ from langchain.chains import RetrievalQA
 from langgraph.checkpoint import MemorySaver
 from langchain.tools.retriever import create_retriever_tool
 from langgraph.prebuilt import create_react_agent
-from langchain.agents import Tool
+from langchain.agents import Tool  # Ensure this import is present
 
 # Load environment variables
 load_dotenv()
@@ -38,11 +37,6 @@ if not OPENAI_API_KEY:
 elif not LANGCHAIN_API_KEY:
     raise ValueError("LANGCHAIN_API_KEY environment variable not set")
 
-os.environ["LANGCHAIN_TRACING_V2"] = "true"
-os.environ["LANGCHAIN_PROJECT"] = "Ironhack_Project3"
-os.environ["LANGCHAIN_ENDPOINT"] = "https://api.smith.langchain.com"
-
-# Set up directories
 os.makedirs('uploads', exist_ok=True)
 os.makedirs('downloads', exist_ok=True)
 
@@ -366,17 +360,20 @@ class VideoChatbot:
             self.qa_chain = None
 
     def create_agent(self):
-        tools = [
-            Tool(
-                name='video_transcript_retriever',
-                func=self.qa_chain.run,
-                description=(
-                    'Searches and returns excerpts from the transcript of the user uploaded video.'
-                )
-            ),
-        ]
-        self.agent = create_react_agent(self.model, tools=tools, messages_modifier=self.prompt, checkpointer=self.memory)
-        st.write("Agent created successfully.")
+        try:
+            tools = [
+                Tool(
+                    name='video_transcript_retriever',
+                    func=self.qa_chain.run,
+                    description=(
+                        'Searches and returns excerpts from the transcript of the user uploaded video.'
+                    )
+                ),
+            ]
+            self.agent = create_react_agent(self.model, tools=tools, messages_modifier=self.prompt, checkpointer=self.memory)
+            st.write("Agent created successfully.")
+        except Exception as e:
+            st.write(f"Error creating agent: {e}")
 
     def process_query(self, query):
         if not self.agent:
